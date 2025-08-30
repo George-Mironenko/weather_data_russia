@@ -103,20 +103,5 @@ def setup_logger():
 # Создаем и настраиваем логгер
 logger = setup_logger()
 
-# Пример использования
-if __name__ == "__main__":
-    logger.debug("Это debug сообщение - должно быть только в файле")
-    logger.info("Это info сообщение")
-    logger.warning("Это warning сообщение")
-    logger.error("Это error сообщение")
-    logger.critical("Это critical сообщение")
-
-    # Сообщения, которые должны быть отфильтрованы
-    logger.info("Пользователь ввел password: 12345")
-    logger.info("Токен доступа: abcdefg")
-    logger.info("Секретный ключ: xyz")
-
-    logger.info("Нормальное сообщение без чувствительных данных")
-
 # Запрет импорта через `from module import *`
 __all__ = []
