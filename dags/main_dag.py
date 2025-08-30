@@ -1,11 +1,9 @@
 from datetime import timedelta
 
-import polars
 from airflow.sdk import DAG
 from airflow.models import Variable
 from airflow.decorators import task
 from airflow.providers.http.hooks.http import HttpHook
-from sympy.physics.vector.printing import params
 
 from loging_etl import logger
 
@@ -58,7 +56,12 @@ with DAG(
 
 
     @task
-    def trigger_spark_transform(extract_results):
+    def load_data_base(extract_results):
+        """
+        Функция которая, отправит данные в базу данных
+        :param extract_results:
+        :return:
+        """
         pass
 
     # Динамическое создание extract-задач
@@ -66,4 +69,4 @@ with DAG(
     extracted = extract.expand(source=sources)
 
     # Transform дожидается всех extract
-    trigger_spark_transform(extracted)
+    load_data_base(extracted)
