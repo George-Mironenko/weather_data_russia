@@ -65,13 +65,14 @@ with DAG(
         :param extract_results:
         :return:
         """
-        sql_create_table = """
-        """
-
         sql_insert ="""
            """
 
         try:
+            with open("script.sql", "r") as file:
+                sql_create_table = file.read()
+            logger.debug("Успешно прочитали файл")
+
             hook = PostgresHook(postgres_conn_id="my_postgres")
             logger.debug("Успешно получили connection из airflow")
 
