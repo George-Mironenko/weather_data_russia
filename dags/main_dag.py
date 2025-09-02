@@ -12,8 +12,6 @@ from loging_etl import logger
 # Получаем API-ключ из переменных Airflow
 API_KEY = Variable.get("data_russia_api")
 
-CITIES = ("Moscow", "Saint Petersburg", "Vladivostok")
-
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
@@ -32,12 +30,31 @@ with DAG(
 ) as dag:
 
     @task
-    def extract(city: str = "Moscow"):
-        if city not in CITIES:
-            logger.error(f"Город {city} не поддерживается")
-            raise ValueError("Город не поддерживается")
-        logger.debug("Город есть в списке")
+    def ger_list_cities():
+        """
+        Эта задача получает список городов из базы данных
+        :return: Список городов по которым надо узнать погоду.
+        """
 
+        sql_select = f"""
+            SELECT name FROM cities
+        """
+        try:
+            hook = PostgresHook(postgres_conn_id="my_postgres")
+            logger.debug("Успешно подключились к postgres для получения списка городов.")
+
+            return hook.get_records(sql_select)
+
+        except Exception as error:
+            logger.error(error)
+
+    @task
+    def get_city_weather(city: str = "Moscow"):
+        """
+        Функция которая, извлекает данные из API
+        :param city: Город по которому надо узнать погоду
+        :return: Данные о погоде в городе
+        """
         try:
             http = HttpHook(method='GET', http_conn_id='openweathermap_api')
 
@@ -65,33 +82,45 @@ with DAG(
         :param extract_results:
         :return:
         """
-        sql_insert ="""
-           """
-
         try:
-            with open("script.sql", "r") as file:
-                sql_create_table = file.read()
-            logger.debug("Успешно прочитали файл")
+            # Получаем sql для вставки данных
+            with open("sql_scripts/script_insert.sql", "r") as file:
+                # Читаем файл
+                sql_insert = file.read()
+            logger.debug("Успешно прочитали файл script_insert")
 
+            # Устанавливаем подключение
             hook = PostgresHook(postgres_conn_id="my_postgres")
             logger.debug("Успешно получили connection из airflow")
 
-            hook.run(
-                sql_create_table
-            )
-            logger.debug("Успешно создали таблицу.")
-
+            # Отправляем данные в базу данных
             hook.run(
                 sql_insert,
-                parameters=(extract_results["city"], extract_results["temp"], extract_results["dt"])
+                parameters=(
+                    extract_results["name"],
+                    extract_results["weather"][0]["id"],
+                    extract_results["main"]["temp"],
+                    extract_results["main"]["temp_min"],
+                    extract_results["main"]["temp_max"],
+                    extract_results["main"]["pressure"],
+                    extract_results["main"]["humidity"],
+                    extract_results["visibility"],
+                    extract_results["wind"]["speed"],
+                    extract_results["wind"]["deg"],
+                    extract_results["clouds"]["all"],
+                    extract_results["dt"],
+                    extract_results["sys"]["sunrise"],
+                    extract_results["sys"]["sunset"]
+                )
             )
             logger.info("Успешно загрузили данные в базу данных")
 
         except Exception as error:
             logger.error(error)
 
-    # Динамическое создание extract-задач
-    extracted = extract.expand(source=CITIES)
-
-    # Transform дожидается всех extract
-    load_data_base(extracted)
+    # Запуск DAG
+    load_data_base(
+        get_city_weather.expand(
+            ger_list_cities
+        )
+    )

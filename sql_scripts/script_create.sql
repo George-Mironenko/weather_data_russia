@@ -1,6 +1,6 @@
-CREATE TABLE IF NOT EXISTS cities (
+    CREATE TABLE IF NOT EXISTS cities (
             city_id SERIAL PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
+            name VARCHAR(100) unique NOT NULL,
             country INT,
             lat DECIMAL(9,6) NOT NULL,
             lon DECIMAL(9,6) NOT NULL,

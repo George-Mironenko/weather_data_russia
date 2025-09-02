@@ -70,7 +70,7 @@ def setup_logger():
 
     # Создаем обработчики
     console_handler = logging.StreamHandler()
-    file_handler = logging.FileHandler("etl.log", encoding='utf-8')
+    file_handler = logging.FileHandler("logs/etl.log", encoding='utf-8')
 
     # Устанавливаем уровни для обработчиков
     console_handler.setLevel(logging.INFO)  # В консоль только INFO и выше
