@@ -1,16 +1,13 @@
 from datetime import timedelta
 
+import requests
 from airflow.sdk import DAG
-from airflow.models import Variable
 from airflow.decorators import task
-from airflow.providers.http.hooks.http import HttpHook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.models import Variable
 
-from loging_etl import logger
 
-
-# Получаем API-ключ из переменных Airflow
-API_KEY = Variable.get("data_russia_api")
+API_KEY = Variable.get("data_api")
 
 default_args = {
     'owner': 'airflow',
@@ -33,94 +30,82 @@ with DAG(
     def ger_list_cities():
         """
         Эта задача получает список городов из базы данных
-        :return: Список городов по которым надо узнать погоду.
         """
-
-        sql_select = f"""
-            SELECT name FROM cities
-        """
+        sql_select = "SELECT name FROM cities"
         try:
             hook = PostgresHook(postgres_conn_id="my_postgres")
-            logger.debug("Успешно подключились к postgres для получения списка городов.")
+            records = hook.get_records(sql_select)
 
-            return hook.get_records(sql_select)
+            # Преобразуем список кортежей в список строк
+            cities_list = [record[0] for record in records if record and record[0]]
+            print(f"Found cities: {cities_list}")
+            return cities_list
 
         except Exception as error:
-            logger.error(error)
+            print(f"Error fetching cities: {error}")
+            return []
 
     @task
-    def get_city_weather(city: str = "Moscow"):
+    def get_city_weather(city: str):
         """
-        Функция которая, извлекает данные из API
-        :param city: Город по которому надо узнать погоду
-        :return: Данные о погоде в городе
+        Функция для получения данных о погоде из API
         """
         try:
-            http = HttpHook(method='GET', http_conn_id='openweathermap_api')
-
-            response = http.run(
-                endpoint="/data/2.5/weather",
-                params= {
-                'q': city,
-                'units': 'metric'
-                }
-            )
-            response.raise_for_status()
-            logger.info("Успешно извлекли данные")
-
-            return response.json()
+            database = requests.get(
+                f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric")
+            return database.json()
 
         except Exception as error:
-            logger.error(error)
+            print(f"Error for {city}: {error}")
             return None
 
 
     @task
-    def load_data_base(extract_results):
+    def load_data_base(weather_data_list):
         """
-        Функция которая, отправит данные в базу данных
-        :param extract_results:
-        :return:
+        Загружает данные о погоде из списка в БД
         """
-        try:
-            # Получаем sql для вставки данных
-            with open("sql_scripts/script_insert.sql", "r") as file:
-                # Читаем файл
-                sql_insert = file.read()
-            logger.debug("Успешно прочитали файл script_insert")
+        hook = PostgresHook(postgres_conn_id="my_postgres")
 
-            # Устанавливаем подключение
-            hook = PostgresHook(postgres_conn_id="my_postgres")
-            logger.debug("Успешно получили connection из airflow")
-
-            # Отправляем данные в базу данных
-            hook.run(
-                sql_insert,
-                parameters=(
-                    extract_results["name"],
-                    extract_results["weather"][0]["id"],
-                    extract_results["main"]["temp"],
-                    extract_results["main"]["temp_min"],
-                    extract_results["main"]["temp_max"],
-                    extract_results["main"]["pressure"],
-                    extract_results["main"]["humidity"],
-                    extract_results["visibility"],
-                    extract_results["wind"]["speed"],
-                    extract_results["wind"]["deg"],
-                    extract_results["clouds"]["all"],
-                    extract_results["dt"],
-                    extract_results["sys"]["sunrise"],
-                    extract_results["sys"]["sunset"]
-                )
+        sql_insert = """
+            INSERT INTO weather_observations
+                (city_id, condition_id, temp, temp_min, temp_max, pressure, humidity,
+                 visibility, wind_speed, wind_deg, clouds_all, recorded_at, sunrise, sunset)
+            VALUES (
+                (SELECT city_id FROM cities WHERE name = %s),
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                TO_TIMESTAMP(%s),
+                TO_TIMESTAMP(%s),
+                TO_TIMESTAMP(%s)
             )
-            logger.info("Успешно загрузили данные в базу данных")
+        """
 
-        except Exception as error:
-            logger.error(error)
 
-    # Запуск DAG
-    load_data_base(
-        get_city_weather.expand(
-            ger_list_cities
-        )
-    )
+        for data in weather_data_list:
+
+            try:
+                # Используем имя города из ответа API или из запроса
+                city_name = data.get('name', data.get('requested_city', 'Unknown'))
+
+                hook.run(sql_insert, parameters=(
+                    city_name,
+                    data["weather"][0]["id"],
+                    data["main"]["temp"],
+                    data["main"]["temp_min"],
+                    data["main"]["temp_max"],
+                    data["main"]["pressure"],
+                    data["main"]["humidity"],
+                    data.get("visibility", 0),
+                    data["wind"].get("speed", 0),
+                    data["wind"].get("deg", 0),
+                    data["clouds"].get("all", 0),
+                    data["dt"],
+                    data["sys"]["sunrise"],
+                    data["sys"]["sunset"]
+                ))
+            except Exception as error:
+                print(error)
+
+    cities = ger_list_cities()
+    weather_data = get_city_weather.expand(city=cities)
+    load_data_base(weather_data)
