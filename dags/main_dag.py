@@ -30,6 +30,7 @@ with DAG(
     def ger_list_cities():
         """
         Эта задача получает список городов из базы данных
+        :return: Список городов
         """
         sql_select = "SELECT name FROM cities"
         try:
@@ -43,29 +44,45 @@ with DAG(
 
         except Exception as error:
             print(f"Error fetching cities: {error}")
-            return []
+            raise
 
     @task
-    def get_city_weather(city: str):
+    def get_city_weather(city: str) -> dict:
         """
         Функция для получения данных о погоде из API
+        :return: Словарь с данными о погоде.
+        :raises requests.exceptions.HTTPError: При HTTP ошибках.
+        :raises requests.exceptions.RequestException: При ошибках запроса.
         """
+        url = "https://samples.openweathermap.org/data/2.5/weather"
+        params = {
+            "q": city,
+            "appid": API_KEY,
+        }
         try:
-            database = requests.get(
-                f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={API_KEY}&units=metric")
-            return database.json()
+            response = requests.get(url=url, params=params, timeout=600)
+            response.raise_for_status()
 
-        except Exception as error:
-            print(f"Error for {city}: {error}")
-            return None
+            return response.json()
+
+        except requests.exceptions.HTTPError as http_err:
+            print(f"HTTP ошибка: {http_err}")
+            raise
+        except requests.exceptions.RequestException as req_err:
+            print(f"Ошибка запроса: {req_err}")
+            raise
+        except Exception as e:
+            print(f"Произошла ошибка: {e}")
+            raise
 
 
     @task
     def load_data_base(weather_data_list):
         """
         Загружает данные о погоде из списка в БД
+        :param weather_data_list: Список словарей с данными о погоде
+        :return None
         """
-        hook = PostgresHook(postgres_conn_id="my_postgres")
 
         sql_insert = """
             INSERT INTO weather_observations
@@ -80,32 +97,41 @@ with DAG(
             )
         """
 
+        try:
+            # Подключение к базе данных
+            hook = PostgresHook(postgres_conn_id="my_postgres")
 
-        for data in weather_data_list:
+            for data in weather_data_list:
 
-            try:
                 # Используем имя города из ответа API или из запроса
                 city_name = data.get('name', data.get('requested_city', 'Unknown'))
 
                 hook.run(sql_insert, parameters=(
-                    city_name,
-                    data["weather"][0]["id"],
-                    data["main"]["temp"],
-                    data["main"]["temp_min"],
-                    data["main"]["temp_max"],
-                    data["main"]["pressure"],
-                    data["main"]["humidity"],
-                    data.get("visibility", 0),
-                    data["wind"].get("speed", 0),
-                    data["wind"].get("deg", 0),
-                    data["clouds"].get("all", 0),
-                    data["dt"],
-                    data["sys"]["sunrise"],
-                    data["sys"]["sunset"]
+                        city_name,
+                        data["weather"][0]["id"],
+                        data["main"]["temp"],
+                        data["main"]["temp_min"],
+                        data["main"]["temp_max"],
+                        data["main"]["pressure"],
+                        data["main"]["humidity"],
+                        data.get("visibility", 0),
+                        data["wind"].get("speed", 0),
+                        data["wind"].get("deg", 0),
+                        data["clouds"].get("all", 0),
+                        data["dt"],
+                        data["sys"]["sunrise"],
+                        data["sys"]["sunset"]
                 ))
-            except Exception as error:
-                print(error)
+        except Exception as error:
+            print(error)
+            raise
 
+    # Выполняем задачи
+    # Получаем список городов
     cities = ger_list_cities()
+
+    # Получаем данные о погоде для каждого города
     weather_data = get_city_weather.expand(city=cities)
+
+    # Загружаем данные в базу данных
     load_data_base(weather_data)
