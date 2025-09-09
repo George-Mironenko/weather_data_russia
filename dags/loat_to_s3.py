@@ -55,6 +55,7 @@ with DAG(
 
     @task
     def transform_load(data):
+        # Создание DataFrame из данных
         columns = [
             "city_name", "weather_id", "temp", "temp_min", "temp_max",
             "pressure", "humidity", "visibility", "wind_speed", "wind_deg",
@@ -62,9 +63,11 @@ with DAG(
         ]
 
         try:
+            # Проверка на пустоту списка
             if data is None:
                 raise Exception('Список пуст')
 
+            # Создание DataFrame
             df = pd.DataFrame(data, columns=columns)
 
             df = df.astype({
