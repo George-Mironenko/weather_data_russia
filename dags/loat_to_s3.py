@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import io
+import io
 
 import pandas as pd
 from airflow.models import Variable
@@ -8,6 +8,23 @@ from airflow.sdk import DAG
 from airflow.decorators import task
 import boto3
 
+import logging
+
+
+# get the airflow.task logger
+task_logger = logging.getLogger("airflow.task")
+
+def get_s3_client():
+    """
+
+    :return:
+    """
+    return boto3.client(
+        's3',
+        endpoint_url='https://s3.storage.selcloud.ru',
+        aws_access_key_id=Variable.get("SELECTEL_ACCESS_KEY"),
+        aws_secret_access_key=Variable.get("SELECTEL_SECRET_KEY")
+    )
 
 default_args = {
     'owen':'airflow',
@@ -22,7 +39,7 @@ default_args = {
 with DAG(
     dag_id="Load_to_S3",
     default_args=default_args,
-    schedule='@daily',
+    schedule='@month',
     fail_fast=True
 ) as dag:
 
@@ -39,18 +56,22 @@ with DAG(
         try:
             # Подключение к базе данных
             hook = PostgresHook(connection="my_postgres")
+            task_logger.debug("Успешно подключились к базе данных")
 
             # Получение данных из таблицы
             data = hook.get_records(sql_scripts_select)
+            task_logger.debug("Успешно получили данные из базы данных")
 
             # Удаление данных из таблицы
             hook.run(
                 sql_scripts_delete
             )
+            task_logger.debug("Успешно удалили данные из базы данных")
+            task_logger.info(f"Успешно извлекли данные из базы данных")
 
             return data
         except Exception as error:
-            print(error)
+            task_logger.error(f"Ошибка при извлечении данных: {error}")
             return None
 
     @task
@@ -69,6 +90,7 @@ with DAG(
 
             # Создание DataFrame
             df = pd.DataFrame(data, columns=columns)
+            task_logger.debug('Мы создали датафрейм')
 
             df = df.astype({
                 "city_name": "string",
@@ -90,20 +112,21 @@ with DAG(
             # Сериализуем в Parquet в памяти (рекомендуется!)
             buffer = io.BytesIO()
             df.to_parquet(buffer, engine='pyarrow', compression='snappy', index=False)
-            buffer.seek(0)
 
             # Конфигурация для подключения к Selectel Object Storage
-            s3 = boto3.client(
-                's3',
-                endpoint_url='https://s3.storage.selcloud.ru',
-                aws_access_key_id=Variable.get("SELECTEL_ACCESS_KEY"),
-                aws_secret_access_key=Variable.get("SELECTEL_SECRET_KEY")
+            s3 = get_s3_client()
+            task_logger.debug('Мы прошли конфигурацию')
+
+            bucket_name = 'weather'
+            file_name = f'data_{datetime.now().year}-{datetime.now().month:02d}.parquet'
+
+            # Отправка данных
+            s3.put_object(
+                Bucket=bucket_name,
+                Key=file_name,
+                Body=buffer.getvalue(),
+                ContentType='application/octet-stream'
             )
-
-            bucket_name = 'nasa'
-            file_name = f'data___nasa_{datetime.now().year}.csv'
-
-            # Загрузка данных в Selectel Object Storage
-            s3.put_object(Bucket=bucket_name, Key=file_name)
+            task_logger.info("Успешно отправили файл в s3")
         except Exception as error:
-                print(error)
+                task_logger.error(f"Ошибка при извлечении данных: {error}")
