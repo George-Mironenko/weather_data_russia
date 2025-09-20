@@ -7,8 +7,6 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.models import Variable
 
 
-API_KEY = Variable.get("data_api")
-
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
@@ -54,6 +52,8 @@ with DAG(
         :raises requests.exceptions.HTTPError: При HTTP ошибках.
         :raises requests.exceptions.RequestException: При ошибках запроса.
         """
+        API_KEY = Variable.get("data_api")
+
         url = "https://samples.openweathermap.org/data/2.5/weather"
         params = {
             "q": city,

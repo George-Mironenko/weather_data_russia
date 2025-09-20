@@ -39,7 +39,7 @@ default_args = {
 with DAG(
     dag_id="Load_to_S3",
     default_args=default_args,
-    schedule='@month',
+    schedule='@monthly',
     fail_fast=True
 ) as dag:
 
