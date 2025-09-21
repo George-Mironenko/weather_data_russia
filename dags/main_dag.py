@@ -30,7 +30,7 @@ with DAG(
         Эта задача получает список городов из базы данных
         :return: Список городов
         """
-        sql_select = "SELECT name FROM cities"
+        sql_select = 'SELECT name FROM "cities"'
         try:
             hook = PostgresHook(postgres_conn_id="my_postgres")
             records = hook.get_records(sql_select)
@@ -54,7 +54,7 @@ with DAG(
         """
         API_KEY = Variable.get("data_api")
 
-        url = "https://samples.openweathermap.org/data/2.5/weather"
+        url = "https://api.openweathermap.org/data/2.5/weather"
         params = {
             "q": city,
             "appid": API_KEY,
@@ -63,7 +63,10 @@ with DAG(
             response = requests.get(url=url, params=params, timeout=600)
             response.raise_for_status()
 
-            return response.json()
+            data = response.json()
+            data['requested_city'] = city
+
+            return data
 
         except requests.exceptions.HTTPError as http_err:
             print(f"HTTP ошибка: {http_err}")
@@ -103,8 +106,7 @@ with DAG(
 
             for data in weather_data_list:
 
-                # Используем имя города из ответа API или из запроса
-                city_name = data.get('name', data.get('requested_city', 'Unknown'))
+                city_name = data.get('requested_city')
 
                 hook.run(sql_insert, parameters=(
                         city_name,

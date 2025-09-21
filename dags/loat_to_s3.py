@@ -4,19 +4,17 @@ import io
 import pandas as pd
 from airflow.models import Variable
 from airflow.providers.postgres.hooks.postgres import PostgresHook
-from airflow.sdk import DAG
+from airflow import DAG
 from airflow.decorators import task
 import boto3
 
 import logging
-
 
 # get the airflow.task logger
 task_logger = logging.getLogger("airflow.task")
 
 def get_s3_client():
     """
-
     :return:
     """
     return boto3.client(
@@ -33,7 +31,7 @@ default_args = {
     'start_date': datetime(2025, 9, 9),
     'retries': 1,
     'retry_delay': timedelta(minutes=1),
-    'depends_on_pats': False,
+    'depends_on_past': False,
 }
 
 with DAG(
@@ -46,32 +44,44 @@ with DAG(
     @task
     def extract():
         sql_scripts_select = """
-        SELECT * FROM weather_observations;
-        """
-
-        sql_scripts_delete = """
-        DELETE FROM weather_observations;
+        SELECT 
+            c.name AS city_name,
+            w.condition_id AS weather_id,
+            w.temp,
+            w.temp_min,
+            w.temp_max,
+            w.pressure,
+            w.humidity,
+            w.visibility,
+            w.wind_speed,
+            w.wind_deg,
+            w.clouds_all,
+            w.recorded_at AS dt,
+            w.sunrise,
+            w.sunset
+        FROM weather_observations w
+        JOIN cities c ON w.city_id = c.city_id;
         """
 
         try:
             # Подключение к базе данных
-            hook = PostgresHook(connection="my_postgres")
+            hook = PostgresHook(postgres_conn_id="my_postgres")
             task_logger.debug("Успешно подключились к базе данных")
 
             # Получение данных из таблицы
             data = hook.get_records(sql_scripts_select)
             task_logger.debug("Успешно получили данные из базы данных")
 
-            # Удаление данных из таблицы
-            hook.run(
-                sql_scripts_delete
-            )
-            task_logger.debug("Успешно удалили данные из базы данных")
-            task_logger.info(f"Успешно извлекли данные из базы данных")
+            task_logger.info("Успешно извлекли данные из базы данных")
 
             return data
+
+        except PostgresHook.get_records as error:
+            task_logger.error(f"Ошибка при получении данных: {error}")
+            return None
+
         except Exception as error:
-            task_logger.error(f"Ошибка при извлечении данных: {error}")
+            task_logger.error(f"Ошибка: {error}")
             return None
 
     @task
@@ -117,7 +127,7 @@ with DAG(
             s3 = get_s3_client()
             task_logger.debug('Мы прошли конфигурацию')
 
-            bucket_name = 'weather'
+            bucket_name = 'weather-data'
             file_name = f'data_{datetime.now().year}-{datetime.now().month:02d}.parquet'
 
             # Отправка данных
@@ -129,4 +139,36 @@ with DAG(
             )
             task_logger.info("Успешно отправили файл в s3")
         except Exception as error:
-                task_logger.error(f"Ошибка при извлечении данных: {error}")
+                task_logger.error(f"Ошибка при преобразовании данных: {error}")
+                raise
+
+    @task
+    def delete_data():
+        sql_scripts_delete = """
+                    DELETE FROM weather_observations;
+                    """
+        try:
+            hooks = PostgresHook(postgres_conn_id="my_postgres")
+            task_logger.debug("Успешно подключились к базе данных")
+
+            hooks.run(
+                sql_scripts_delete
+            )
+            task_logger.info("Мы успешно освободили место для таблицы")
+
+        except Exception as error:
+             task_logger.error(f"Ошибка при удалении данных: {error}")
+             raise
+
+
+    # Получаем данные из postgres
+    data = extract()
+
+    # Создаем parquet и отправляем в s3
+    load_task = transform_load(data)
+
+    # Удаляем данные из postgres
+    delete_task = delete_data()
+
+    # Задаём порядок: сначала load_task, потом delete_task
+    load_task >> delete_task

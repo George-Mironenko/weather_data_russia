@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS cities (
             name VARCHAR(100) unique NOT NULL,
             country INT,
             lat DECIMAL(9,6) NOT NULL,
-            lon DECIMAL(9,6) NOT NULL,
+            lon DECIMAL(9,6) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS weather_main_types (
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS weather_main_types (
 
 CREATE TABLE IF NOT EXISTS weather_icons (
     icons_id SERIAL PRIMARY KEY,
-    icon_code VARCHAR(3),
+    icon_code VARCHAR(3)
 );
 
 CREATE TABLE IF NOT EXISTS weather_conditions (
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS weather_conditions (
 );
 
 CREATE TABLE IF NOT EXISTS weather_observations (
-            weather_observations_id SERIAL PRIMARY KEY
+            weather_observations_id SERIAL PRIMARY KEY,
             city_id BIGINT REFERENCES cities(city_id),
             condition_id INT REFERENCES weather_conditions(condition_id),
             temp DECIMAL(6,2) NOT NULL,
@@ -42,13 +42,13 @@ CREATE TABLE IF NOT EXISTS weather_observations (
             created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS "Country" (
+CREATE TABLE IF NOT EXISTS country (
     "id" SERIAL PRIMARY KEY,
     "name" VARCHAR(40) NOT NULL
 );
 
 ALTER table "cities"
-    add CONSTRAINT "cities_country_foreign" foreign key("country") REFERENCES "County"("id");
+    add CONSTRAINT "cities_country_foreign" foreign key("country") REFERENCES "country"("id");
 
 INSERT INTO weather_main_types (main_name) VALUES
 ('Thunderstorm'),
@@ -79,7 +79,7 @@ INSERT INTO weather_icons (icon_code) VALUES
 ('50d'), ('50n');
 
 
-INSERT INTO weather_conditions (condition_id, main_id, description, icon_id) VALUES
+INSERT INTO weather_conditions (condition_id, main, description, icon) VALUES
 -- Thunderstorm
 (200, (SELECT main_id FROM weather_main_types WHERE main_name = 'Thunderstorm'), 'thunderstorm with light rain', (SELECT icons_id FROM weather_icons WHERE icon_code = '11d')),
 (201, (SELECT main_id FROM weather_main_types WHERE main_name = 'Thunderstorm'), 'thunderstorm with rain', (SELECT icons_id FROM weather_icons WHERE icon_code = '11d')),
@@ -147,16 +147,16 @@ INSERT INTO weather_conditions (condition_id, main_id, description, icon_id) VAL
 (801, (SELECT main_id FROM weather_main_types WHERE main_name = 'Clouds'), 'few clouds: 11-25%', (SELECT icons_id FROM weather_icons WHERE icon_code = '02d')),
 (802, (SELECT main_id FROM weather_main_types WHERE main_name = 'Clouds'), 'scattered clouds: 25-50%', (SELECT icons_id FROM weather_icons WHERE icon_code = '03d')),
 (803, (SELECT main_id FROM weather_main_types WHERE main_name = 'Clouds'), 'broken clouds: 51-84%', (SELECT icons_id FROM weather_icons WHERE icon_code = '04d')),
-(804, (SELECT main_id FROM weather_main_types WHERE main_name = 'Clouds'), 'overcast clouds: 85-100%', (SELECT icons_id FROM weather_icons WHERE icon_code = '04d'))
+(804, (SELECT main_id FROM weather_main_types WHERE main_name = 'Clouds'), 'overcast clouds: 85-100%', (SELECT icons_id FROM weather_icons WHERE icon_code = '04d'));
 
 
 INSERT INTO "country" ("name")
 VALUES
     ('Russia'),
-    ('United Kingdom')
+    ('United Kingdom');
 
 INSERT INTO cities (name, country, lat, lon)
 VALUES
     ('Vladivostok', (SELECT "id" FROM "country" WHERE "name" = 'Russia'), 43.115540, 131.885498),
     ('Moscow',      (SELECT "id" FROM "country" WHERE "name" = 'Russia'), 55.755826, 37.617300),
-    ('London',      (SELECT "id" FROM "country" WHERE "name" = 'United Kingdom'), 51.507351, -0.127758)
+    ('London',      (SELECT "id" FROM "country" WHERE "name" = 'United Kingdom'), 51.507351, -0.127758);
