@@ -6,6 +6,9 @@ from airflow.decorators import task
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.models import Variable
 
+import logging
+
+task_logger = logging.getLogger("airflow.task")
 
 default_args = {
     'owner': 'airflow',
@@ -33,15 +36,20 @@ with DAG(
         sql_select = 'SELECT name FROM "cities"'
         try:
             hook = PostgresHook(postgres_conn_id="my_postgres")
+            task_logger.debug("Мы подключились к postgres")
+
             records = hook.get_records(sql_select)
+            task_logger.debug("Получили данные из бд")
 
             # Преобразуем список кортежей в список строк
             cities_list = [record[0] for record in records if record and record[0]]
-            print(f"Found cities: {cities_list}")
+            task_logger.debug("Преобразовали в кортеж")
+
+            task_logger.info("Успешно получили города")
             return cities_list
 
         except Exception as error:
-            print(f"Error fetching cities: {error}")
+            task_logger.error(f"Error fetching cities: {error}")
             raise
 
     @task
@@ -52,30 +60,37 @@ with DAG(
         :raises requests.exceptions.HTTPError: При HTTP ошибках.
         :raises requests.exceptions.RequestException: При ошибках запроса.
         """
+        # Получаем api ключ из airflow
         API_KEY = Variable.get("data_api")
 
         url = "https://api.openweathermap.org/data/2.5/weather"
+
+        # Строим api ссылку
         params = {
             "q": city,
             "appid": API_KEY,
         }
         try:
             response = requests.get(url=url, params=params, timeout=600)
+            task_logger.debug("Сделали запрос к Api")
+
             response.raise_for_status()
+            task_logger.debug("Проверили на ошибку")
 
             data = response.json()
             data['requested_city'] = city
+            task_logger.debug("Успешно преобразовали в json")
 
             return data
 
         except requests.exceptions.HTTPError as http_err:
-            print(f"HTTP ошибка: {http_err}")
+            task_logger.error(f"HTTP ошибка: {http_err}")
             raise
         except requests.exceptions.RequestException as req_err:
-            print(f"Ошибка запроса: {req_err}")
+            task_logger.error(f"Ошибка запроса: {req_err}")
             raise
         except Exception as e:
-            print(f"Произошла ошибка: {e}")
+            task_logger.error(f"Произошла ошибка: {e}")
             raise
 
 
@@ -103,9 +118,10 @@ with DAG(
         try:
             # Подключение к базе данных
             hook = PostgresHook(postgres_conn_id="my_postgres")
+            task_logger.debug("Мы подключились к postgres")
 
+            # Цикл для добавления данных
             for data in weather_data_list:
-
                 city_name = data.get('requested_city')
 
                 hook.run(sql_insert, parameters=(
@@ -124,8 +140,10 @@ with DAG(
                         data["sys"]["sunrise"],
                         data["sys"]["sunset"]
                 ))
+
+                task_logger.info("Успешно сохранили данные")
         except Exception as error:
-            print(error)
+            task_logger.error(f"Ошибка при преобразование: {error}")
             raise
 
     # Выполняем задачи

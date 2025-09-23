@@ -10,12 +10,12 @@ import boto3
 
 import logging
 
-# get the airflow.task logger
+
 task_logger = logging.getLogger("airflow.task")
 
 def get_s3_client():
     """
-    :return:
+    Создаём клиента s3 хранилища
     """
     return boto3.client(
         's3',
@@ -43,6 +43,11 @@ with DAG(
 
     @task
     def extract():
+        """
+        Получаем данные из postgres
+        :return: данные по погоде за месяц
+        """
+
         sql_scripts_select = """
         SELECT 
             c.name AS city_name,
@@ -86,6 +91,11 @@ with DAG(
 
     @task
     def transform_load(data):
+        """
+        Преобразовываем в формат parquet и отправляет в s3
+        :param data: Данные для, преобразование в файл
+        """
+
         # Создание DataFrame из данных
         columns = [
             "city_name", "weather_id", "temp", "temp_min", "temp_max",
@@ -144,6 +154,10 @@ with DAG(
 
     @task
     def delete_data():
+        """
+        Удаляем данные из postgres
+        """
+
         sql_scripts_delete = """
                     DELETE FROM weather_observations;
                     """
