@@ -115,16 +115,28 @@ with DAG(
             )
         """
 
+        parameters = []
         try:
             # Подключение к базе данных
             hook = PostgresHook(postgres_conn_id="my_postgres")
             task_logger.debug("Мы подключились к postgres")
 
+
             # Цикл для добавления данных
             for data in weather_data_list:
+                if data is None:
+                    continue
+
                 city_name = data.get('requested_city')
 
-                hook.run(sql_insert, parameters=(
+                city_id_sql = 'SELECT city_id FROM cities WHERE name = %s'
+                city_id = hook.get_first(city_id_sql, parameters=(city_name,))
+
+                if city_id is None:
+                    task_logger.warning(f"Город {city_name} не найден в базе")
+                    continue
+
+                parameters.append((
                         city_name,
                         data["weather"][0]["id"],
                         data["main"]["temp"],
@@ -141,7 +153,18 @@ with DAG(
                         data["sys"]["sunset"]
                 ))
 
-                task_logger.info("Успешно сохранили данные")
+                if parameters:
+                    hook.insert_rows(
+                        sql_insert,
+                        parameters,
+                        target_fields=[
+                    'city_id', 'condition_id', 'temp', 'temp_min', 'temp_max',
+                    'pressure', 'humidity', 'visibility', 'wind_speed',
+                    'wind_deg', 'clouds_all', 'recorded_at', 'sunrise', 'sunset'
+                ])
+
+                task_logger.info(f"Успешно загружено {len(parameters)} записей")
+
         except Exception as error:
             task_logger.error(f"Ошибка при преобразование: {error}")
             raise

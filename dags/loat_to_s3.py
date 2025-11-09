@@ -181,8 +181,5 @@ with DAG(
     # Создаем parquet и отправляем в s3
     load_task = transform_load(data)
 
-    # Удаляем данные из postgres
-    delete_task = delete_data()
-
     # Задаём порядок: сначала load_task, потом delete_task
-    load_task >> delete_task
+    load_task >> delete_data()
