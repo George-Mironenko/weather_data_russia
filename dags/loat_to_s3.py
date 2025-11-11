@@ -25,7 +25,7 @@ def get_s3_client():
     )
 
 default_args = {
-    'owen':'airflow',
+    'owner':'airflow',
     'email':'georgijmironenko36@gmail.com',
     'email_on_failure': True,
     'start_date': datetime(2025, 9, 9),
@@ -81,10 +81,6 @@ with DAG(
 
             return data
 
-        except PostgresHook.get_records as error:
-            task_logger.error(f"Ошибка при получении данных: {error}")
-            return None
-
         except Exception as error:
             task_logger.error(f"Ошибка: {error}")
             return None
@@ -106,7 +102,9 @@ with DAG(
         try:
             # Проверка на пустоту списка
             if data is None:
-                raise Exception('Список пуст')
+                task_logger.error('Ошибка в transform_load пустое значение.')
+                raise ValueError("Данные отсутствуют или пусты")
+            task_logger.debug('Список не пустой')
 
             # Создание DataFrame
             df = pd.DataFrame(data, columns=columns)
@@ -159,7 +157,7 @@ with DAG(
         """
 
         sql_scripts_delete = """
-                    DELETE FROM weather_observations;
+                    DELETE FROM weather_observations WHERE recorded_at < NOW() - INTERVAL '1 month'
                     """
         try:
             hooks = PostgresHook(postgres_conn_id="my_postgres")

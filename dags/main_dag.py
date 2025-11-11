@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 import requests
 from airflow.sdk import DAG
@@ -8,12 +8,14 @@ from airflow.models import Variable
 
 import logging
 
+from torch.distributed.algorithms.ddp_comm_hooks.powerSGD_hook import batched_powerSGD_hook
+
 task_logger = logging.getLogger("airflow.task")
 
 default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
-    'start_date': '2025-05-13',
+    'start_date': datetime(year=2025, month=11, day=10),
     'email_on_failure': True,
     'email': ['georgijmironenko36@gmail.com'],
     'retries': 4,
@@ -116,60 +118,75 @@ with DAG(
         """
 
         parameters = []
+        batch_size = 1000
+
         try:
             # Подключение к базе данных
             hook = PostgresHook(postgres_conn_id="my_postgres")
+            conn = hook.get_conn()
+            cursor = conn.cursor()
+
             task_logger.debug("Мы подключились к postgres")
 
+            for i in range(0, len(weather_data_list), batch_size):
+                batch = weather_data_list[i: i + batch_size]
+                task_logger.debug("Создали батч")
 
-            # Цикл для добавления данных
-            for data in weather_data_list:
-                if data is None:
-                    continue
+                # Цикл для добавления данных
+                for data in batch:
+                    if data is None:
+                        task_logger.debug(f"batch с {i} до {i + batch_size} пустой")
+                        continue
 
-                city_name = data.get('requested_city')
+                    task_logger.debug(f"batch с {i} до {i + batch_size} не пустой")
 
-                city_id_sql = 'SELECT city_id FROM cities WHERE name = %s'
-                city_id = hook.get_first(city_id_sql, parameters=(city_name,))
+                    city_name = data.get('requested_city')
 
-                if city_id is None:
-                    task_logger.warning(f"Город {city_name} не найден в базе")
-                    continue
+                    city_id_sql = 'SELECT city_id FROM cities WHERE name = %s'
+                    city_id = hook.get_first(city_id_sql, parameters=(city_name,))
+                    task_logger.debug("Получили city_id")
 
-                parameters.append((
-                        city_name,
-                        data["weather"][0]["id"],
-                        data["main"]["temp"],
-                        data["main"]["temp_min"],
-                        data["main"]["temp_max"],
-                        data["main"]["pressure"],
-                        data["main"]["humidity"],
-                        data.get("visibility", 0),
-                        data["wind"].get("speed", 0),
-                        data["wind"].get("deg", 0),
-                        data["clouds"].get("all", 0),
-                        data["dt"],
-                        data["sys"]["sunrise"],
-                        data["sys"]["sunset"]
-                ))
+                    if city_id is None:
+                        task_logger.warning(f"Город {city_name} не найден в базе")
+                        continue
+
+                    task_logger.debug(f"Город {city_name} найден в базе")
+
+                    parameters.append((
+                            city_name,
+                            data["weather"][0]["id"],
+                            data["main"]["temp"],
+                            data["main"]["temp_min"],
+                            data["main"]["temp_max"],
+                            data["main"]["pressure"],
+                            data["main"]["humidity"],
+                            data.get("visibility", 0),
+                            data["wind"].get("speed", 0),
+                            data["wind"].get("deg", 0),
+                            data["clouds"].get("all", 0),
+                            data["dt"],
+                            data["sys"]["sunrise"],
+                            data["sys"]["sunset"]
+                    ))
 
                 if parameters:
-                    hook.insert_rows(
-                        sql_insert,
-                        parameters,
-                        target_fields=[
-                    'city_id', 'condition_id', 'temp', 'temp_min', 'temp_max',
-                    'pressure', 'humidity', 'visibility', 'wind_speed',
-                    'wind_deg', 'clouds_all', 'recorded_at', 'sunrise', 'sunset'
-                ])
+                    task_logger.debug("Данные есть в parameters")
 
-                task_logger.info(f"Успешно загружено {len(parameters)} записей")
+                    cursor.executemany(sql_insert, parameters)
+                    conn.commit()
+                    task_logger.info(f"Успешно загружено {len(parameters)} записей")
+                else:
+                    task_logger.warning("Нет данных для вставки")
+
+            cursor.close()
+            task_logger.info("Успешно закрытия курсора")
 
         except Exception as error:
             task_logger.error(f"Ошибка при преобразование: {error}")
             raise
 
     # Выполняем задачи
+
     # Получаем список городов
     cities = ger_list_cities()
 
