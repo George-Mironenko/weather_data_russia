@@ -126,7 +126,7 @@ with DAG(
                 (city_id, condition_id, temp, temp_min, temp_max, pressure, humidity,
                  visibility, wind_speed, wind_deg, clouds_all, recorded_at, sunrise, sunset)
             VALUES (
-                (SELECT city_id FROM cities WHERE name = %s),
+                %s,
                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                 TO_TIMESTAMP(%s),
                 TO_TIMESTAMP(%s),
@@ -170,7 +170,7 @@ with DAG(
                     task_logger.debug(f"Город {city_name} найден в базе")
 
                     parameters.append((
-                            city_name,
+                            city_id[0],
                             data["weather"][0]["id"],
                             data["main"]["temp"],
                             data["main"]["temp_min"],
