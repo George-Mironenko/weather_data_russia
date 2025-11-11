@@ -8,7 +8,6 @@ from airflow.models import Variable
 
 import logging
 
-from torch.distributed.algorithms.ddp_comm_hooks.powerSGD_hook import batched_powerSGD_hook
 
 task_logger = logging.getLogger("airflow.task")
 
@@ -21,6 +20,22 @@ default_args = {
     'retries': 4,
     'retry_delay': timedelta(minutes=2),
 }
+
+def get_cities_list(records: tuple) -> list | None:
+    """
+    Функция для преобразования списка кортежей в список строк
+    :param records: Список кортежей
+    :return: Список строк
+    """
+    try:
+        if not records:
+            task_logger.error(f"Ошибка: в функцию передан пустой список")
+            return None
+
+        return [record[0] for record in records if record and record[0]]
+    except Exception as eroor:
+        task_logger.error(f"Ошибка при преобразование списока кортежей в список строк {eroor}")
+        return None
 
 with DAG(
     dag_id='russia_data_weather',
@@ -44,8 +59,12 @@ with DAG(
             task_logger.debug("Получили данные из бд")
 
             # Преобразуем список кортежей в список строк
-            cities_list = [record[0] for record in records if record and record[0]]
+            cities_list = get_cities_list(records)
             task_logger.debug("Преобразовали в кортеж")
+
+            if not cities_list:
+                task_logger.warning("Список городов пуст")
+                return None
 
             task_logger.info("Успешно получили города")
             return cities_list
