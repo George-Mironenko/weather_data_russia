@@ -11,6 +11,7 @@ import boto3
 import logging
 
 
+# Настройка логгера
 task_logger = logging.getLogger("airflow.task")
 
 def get_s3_client():
@@ -86,10 +87,11 @@ with DAG(
             return None
 
     @task
-    def transform_load(data):
+    def transform_load(data) -> pd.DataFrame:
         """
         Преобразовываем в формат parquet и отправляет в s3
         :param data: Данные для, преобразование в файл
+        :return: данные для отправки в s3
         """
 
         # Создание DataFrame из данных
@@ -127,16 +129,28 @@ with DAG(
                 "sunset": "int64"
             })
 
-            # Сериализуем в Parquet в памяти (рекомендуется!)
-            buffer = io.BytesIO()
-            df.to_parquet(buffer, engine='pyarrow', compression='snappy', index=False)
+            return df
+        except Exception as error:
+                task_logger.error(f"Ошибка при преобразовании данных: {error}")
+                raise
 
-            # Конфигурация для подключения к Selectel Object Storage
+    @task
+    def push_s3(data_frame: pd.DataFrame):
+        """
+        Преобразование данных в формат parquet и отправка файла в хранилище s3
+        :param data_frame: Данные для преобразования
+        """
+        try:
+            buffer = io.BytesIO()
+            data_frame.to_parquet(buffer, engine='pyarrow', compression='snappy', index=False)
+            task_logger.debug("Буфер и файл parquet созданы")
+
             s3 = get_s3_client()
-            task_logger.debug('Мы прошли конфигурацию')
+            task_logger.debug("Клиент s3 создан")
 
             bucket_name = 'weather-data'
             file_name = f'data_{datetime.now().year}-{datetime.now().month:02d}.parquet'
+            task_logger.debug("Название файла создано")
 
             # Отправка данных
             s3.put_object(
@@ -146,9 +160,10 @@ with DAG(
                 ContentType='application/octet-stream'
             )
             task_logger.info("Успешно отправили файл в s3")
+
         except Exception as error:
-                task_logger.error(f"Ошибка при преобразовании данных: {error}")
-                raise
+            task_logger.error(f"Ошибка при преобразовании данных: {error}")
+            raise
 
     @task
     def delete_data():
@@ -178,6 +193,9 @@ with DAG(
 
     # Создаем parquet и отправляем в s3
     load_task = transform_load(data)
+
+    # Отправляем изменения в хранилище s3
+    push_s3(load_task)
 
     # Задаём порядок: сначала load_task, потом delete_task
     load_task >> delete_data()
