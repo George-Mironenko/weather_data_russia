@@ -1,3 +1,10 @@
+import sys
+import os
+import pytest
+
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 from dags.main_dag import get_cities_list
 
 
@@ -85,3 +92,6 @@ class TestGetCitiesList:
          result = get_cities_list(test_records)
 
          assert result == ["Москва", "Санкт-Петербург"]
+
+if __name__ == '__main__':
+    pytest.main([__file__, "-v"])
