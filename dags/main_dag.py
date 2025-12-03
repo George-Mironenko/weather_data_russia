@@ -175,24 +175,25 @@ with DAG(
                         continue
 
                     # Проверка, что данные об температуре есть
-                    if not data.get("main") or  data['main'].get('temp'):
-                        invalid_records_append(city_name, data, 'Missing temp')
-                        task_logger.error("Нет данных")
+                    if not data.get("main"):
+                        invalid_records_append(city_name, data, 'Missing main object')
                         continue
 
                     # Проверяем, что данные об температуре есть и они правдивы
-                    if temp := data['main'].get("temp") is None:
+                    if (temp := data['main'].get("temp")) is None:
                         invalid_records_append(city_name, data, 'Missing temp')
                         continue
-                    elif  temp < -89.2 or temp > 56.7:
+
+                    if  temp < -89.2 or temp > 56.7:
                         invalid_records_append(city_name, data, f'Impossible temp: {temp}')
                         continue
 
-                    # Проверяем, что данные об влажности  и они правдивы
-                    if humidity := data['main'].get('humidity') is None:
+                    # Проверяем, что данные об влажности и они правдивы
+                    if (humidity := data['main'].get('humidity')) is None:
                         invalid_records_append(city_name, data, 'Missing humidity')
                         continue
-                    elif not (0 <= humidity <= 100):
+
+                    if not (0 <= humidity <= 100):
                         invalid_records_append(city_name, data, f'Invalid humidity: {humidity}')
                         continue
 
