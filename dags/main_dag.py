@@ -197,6 +197,30 @@ with DAG(
                         invalid_records_append(city_name, data, f'Invalid humidity: {humidity}')
                         continue
 
+                    if (pressure := data['main'].get('pressure')) is not None:
+                        invalid_records_append(city_name, data, 'Missing pressure')
+                        continue
+
+                    if pressure < 870 or pressure > 1085:
+                        invalid_records_append(city_name, data, f'Impossible pressure: {pressure}')
+                        continue
+
+                    if not (temp_min := data['main'].get('temp_min')):
+                        invalid_records_append(city_name, data, 'Missing temp_min')
+                        continue
+                    elif not (temp_max := data['main'].get('temp_max')):
+                        invalid_records_append(city_name, data, 'Missing temp_max')
+                        continue
+
+                    if temp_min > temp_max:
+                        task_logger.error(f"temp_min ({temp_min}) > temp_max ({temp_max})")
+                        continue
+
+                    if not (temp_min <= temp <= temp_max):
+                        task_logger.error(f"temp ({temp}) not between min/max ({temp_min}/{temp_max})")
+                        continue
+
+
                     task_logger.debug(f"batch с {i} до {i + batch_size} не пустой")
 
                     city_id_sql = 'SELECT city_id FROM cities WHERE name = %s'
