@@ -8,6 +8,7 @@ from airflow.models import Variable
 
 import logging
 
+from natsort import humansorted
 
 task_logger = logging.getLogger("airflow.task")
 
@@ -137,7 +138,17 @@ with DAG(
         parameters = []
         batch_size = 1000
 
+        # Список для пропущенных данных
+        invalid_records = []
+
         try:
+            def invalid_records_append(name_city, data_list, test_error: str = 'Not Specified'):
+                """
+                Функция для добавления данные в список пропущенных данных
+                """
+                invalid_records.append(
+                    {'city': name_city, 'error': test_error, 'data': data_list})
+
             # Подключение к базе данных
             hook = PostgresHook(postgres_conn_id="my_postgres")
             conn = hook.get_conn()
@@ -145,19 +156,47 @@ with DAG(
 
             task_logger.debug("Мы подключились к postgres")
 
+            # Цикл для, добавление данных в пакетах
             for i in range(0, len(weather_data_list), batch_size):
+
+                # Делаем срез данных и делаем пакет
                 batch = weather_data_list[i: i + batch_size]
                 task_logger.debug("Создали батч")
 
+
                 # Цикл для добавления данных
                 for data in batch:
+                    # Получаем название города
+                    city_name = data.get('requested_city')
+
+                    # Проверяем что данные есть
                     if data is None:
                         task_logger.debug(f"batch с {i} до {i + batch_size} пустой")
                         continue
 
-                    task_logger.debug(f"batch с {i} до {i + batch_size} не пустой")
+                    # Проверка, что данные об температуре есть
+                    if not data.get("main") or  data['main'].get('temp'):
+                        invalid_records_append(city_name, data, 'Missing temp')
+                        task_logger.error("Нет данных")
+                        continue
 
-                    city_name = data.get('requested_city')
+                    # Проверяем, что данные об температуре есть и они правдивы
+                    if temp := data['main'].get("temp") is None:
+                        invalid_records_append(city_name, data, 'Missing temp')
+                        continue
+                    elif  temp < -89.2 or temp > 56.7:
+                        invalid_records_append(city_name, data, f'Impossible temp: {temp}')
+                        continue
+
+                    # Проверяем, что данные об влажности  и они правдивы
+                    if humidity := data['main'].get('humidity') is None:
+                        invalid_records_append(city_name, data, 'Missing humidity')
+                        continue
+                    elif not (0 <= humidity <= 100):
+                        invalid_records_append(city_name, data, f'Invalid humidity: {humidity}')
+                        continue
+
+                    task_logger.debug(f"batch с {i} до {i + batch_size} не пустой")
 
                     city_id_sql = 'SELECT city_id FROM cities WHERE name = %s'
                     city_id = hook.get_first(city_id_sql, parameters=(city_name,))
@@ -185,6 +224,12 @@ with DAG(
                             data["sys"]["sunrise"],
                             data["sys"]["sunset"]
                     ))
+
+                if invalid_records:
+                    task_logger.warning(f"Найдено {len(invalid_records)} проблемных записей:")
+                    for record in invalid_records:
+                        task_logger.warning(f"Город {record['city']}: {record['error']}")
+
 
                 if parameters:
                     task_logger.debug("Данные есть в parameters")
