@@ -8,7 +8,7 @@ from airflow.models import Variable
 
 import logging
 
-from natsort import humansorted
+from structlog.dev import default_exception_formatter
 
 task_logger = logging.getLogger("airflow.task")
 
@@ -52,7 +52,7 @@ with DAG(
             raise
 
     @task
-    def get_cities_list(records: tuple) -> list | None:
+    def get_cities_list(records: tuple[tuple[str, ...], ...]) -> list[str] | None:
         """
         Функция для преобразования списка кортежей в список строк
         :param records: Список кортежей
@@ -63,8 +63,40 @@ with DAG(
                 task_logger.error(f"Ошибка: в функцию передан пустой список")
                 return None
 
-            cities_list = [record[0] for record in records if record and record[0]]
+            def writte_log(warrning: str):
+                task_logger.warning(
+                    f"Запись #{idx} пропущена: warrning"
+                )
+
+            cities_list = []
+
+            for idx, record in enumerate(records, 1):
+
+                if not isinstance(record, tuple):
+                    writte_log("ожидался tuple")
+                    continue
+
+                if not record:
+                    writte_log("пустой кортеж")
+                    continue
+
+                if not isinstance(first_records :=  record[0], str):
+                    writte_log("первый элемент не строка")
+                    continue
+
+                if  not first_records.strip():
+                    writte_log("пустая строка или пробелы")
+                    continue
+
+                cities_list.append(first_records)
+
             task_logger.debug(f"Успешно список преобразован")
+
+            if not cities_list:
+                task_logger.error(
+                    f"Ни одна запись не прошла валидацию. "
+                )
+                return None
 
             return cities_list
 
