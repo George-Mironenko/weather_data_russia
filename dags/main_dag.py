@@ -8,7 +8,6 @@ from airflow.models import Variable
 
 import logging
 
-from structlog.dev import default_exception_formatter
 
 task_logger = logging.getLogger("airflow.task")
 
@@ -21,7 +20,6 @@ default_args = {
     'retries': 4,
     'retry_delay': timedelta(minutes=2),
 }
-
 
 
 with DAG(
@@ -216,7 +214,7 @@ with DAG(
                         invalid_records_append(city_name, data, 'Missing temp')
                         continue
 
-                    if  temp < -89.2 or temp > 56.7:
+                    if  temp < 223.15 or temp > 323.15:
                         invalid_records_append(city_name, data, f'Impossible temp: {temp}')
                         continue
 
@@ -227,14 +225,6 @@ with DAG(
 
                     if not (0 <= humidity <= 100):
                         invalid_records_append(city_name, data, f'Invalid humidity: {humidity}')
-                        continue
-
-                    if (pressure := data['main'].get('pressure')) is not None:
-                        invalid_records_append(city_name, data, 'Missing pressure')
-                        continue
-
-                    if pressure < 870 or pressure > 1085:
-                        invalid_records_append(city_name, data, f'Impossible pressure: {pressure}')
                         continue
 
                     if not (temp_min := data['main'].get('temp_min')):
