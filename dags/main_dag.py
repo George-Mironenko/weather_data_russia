@@ -181,8 +181,6 @@ with DAG(
 
             # Подключение к базе данных
             hook = PostgresHook(postgres_conn_id="my_postgres")
-            conn = hook.get_conn()
-            cursor = conn.cursor()
 
             task_logger.debug("Мы подключились к postgres")
 
@@ -281,13 +279,17 @@ with DAG(
                 if parameters:
                     task_logger.debug("Данные есть в parameters")
 
+                    conn = hook.get_conn()
+                    cursor = conn.cursor()
+
                     cursor.executemany(sql_insert, parameters)
                     conn.commit()
+
+                    cursor.close()
                     task_logger.info(f"Успешно загружено {len(parameters)} записей")
                 else:
                     task_logger.warning("Нет данных для вставки")
 
-            cursor.close()
             task_logger.info("Успешно закрытия курсора")
 
         except Exception as error:

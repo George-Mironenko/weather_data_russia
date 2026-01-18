@@ -49,24 +49,9 @@ with DAG(
         :return: данные по погоде за месяц
         """
 
+        # Запрос к VIEW
         sql_scripts_select = """
-        SELECT 
-            c.name AS city_name,
-            w.condition_id AS weather_id,
-            w.temp,
-            w.temp_min,
-            w.temp_max,
-            w.pressure,
-            w.humidity,
-            w.visibility,
-            w.wind_speed,
-            w.wind_deg,
-            w.clouds_all,
-            w.recorded_at AS dt,
-            w.sunrise,
-            w.sunset
-        FROM weather_observations w
-        JOIN cities c ON w.city_id = c.city_id;
+        SELECT * FROM all_data;
         """
 
         try:

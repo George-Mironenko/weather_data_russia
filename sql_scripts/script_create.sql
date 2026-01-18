@@ -160,3 +160,22 @@ VALUES
     ('Vladivostok', (SELECT "id" FROM "country" WHERE "name" = 'Russia'), 43.115540, 131.885498),
     ('Moscow',      (SELECT "id" FROM "country" WHERE "name" = 'Russia'), 55.755826, 37.617300),
     ('London',      (SELECT "id" FROM "country" WHERE "name" = 'United Kingdom'), 51.507351, -0.127758);
+
+CREATE VIEW all_data AS
+SELECT
+    c.name AS city_name,
+    w.condition_id AS weather_id,
+    w.temp,
+    w.temp_min,
+    w.temp_max,
+    w.pressure,
+    w.humidity,
+    w.visibility,
+    w.wind_speed,
+    w.wind_deg,
+    w.clouds_all,
+    w.recorded_at AS dt,
+    w.sunrise,
+    w.sunset
+FROM weather_observations w
+JOIN cities c ON w.city_id = c.city_id;
