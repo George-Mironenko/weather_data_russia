@@ -11,12 +11,12 @@ import boto3
 import logging
 
 
-# Настройка логгера
+# Configuring  logger
 task_logger = logging.getLogger("airflow.task")
 
 def get_s3_client():
     """
-    Создаём клиента s3 хранилища
+    Creating client s3 storage
     """
     return boto3.client(
         's3',
@@ -55,11 +55,11 @@ with DAG(
         """
 
         try:
-            # Подключение к базе данных
+            # Connecting to database
             hook = PostgresHook(postgres_conn_id="my_postgres")
-            task_logger.debug("Успешно подключились к базе данных")
+            task_logger.debug("Successfully connected to database")
 
-            # Получение данных из таблицы
+            # Get data from table
             data = hook.get_records(sql_scripts_select)
             task_logger.debug("Успешно получили данные из базы данных")
 
@@ -91,7 +91,7 @@ with DAG(
             if data is None:
                 task_logger.error('Ошибка в transform_load пустое значение.')
                 raise ValueError("Данные отсутствуют или пусты")
-            task_logger.debug('Список не пустой')
+            task_logger.debug('The list is not empty')
 
             # Создание DataFrame
             df = pd.DataFrame(data, columns=columns)
