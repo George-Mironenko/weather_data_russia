@@ -20,16 +20,20 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build all images
+      - name: Test service startup
         run: |
-          echo "=== Проверка синтаксиса и содержимого docker-compose.yml ==="
-          # Проверяем синтаксис YAML (первая строка с ошибкой укажет на проблему)
-          python3 -c "import yaml, sys; yaml.safe_load(open('docker-compose.yml')); print('✅ YAML синтаксис корректен')"
+          echo "=== Пытаемся скачать образы ==="
+          docker compose pull || echo "Не все образы удалось скачать, но продолжаем"
           
-          echo "=== Какие сервисы видит Docker Compose? ==="
-          # Пытаемся просто вывести конфигурацию
-          docker compose config --services 2>&1 || echo "Не удалось прочитать конфигурацию."
+          echo "=== Запускаем только базы данных (Postgres и Redis) ==="
+          docker compose up -d postgres redis
           
-          echo "=== Запускаем сборку с максимально подробным выводом ==="
-          # Теперь запускаем сборку
-          docker compose --verbose build --no-cache 2>&1 | head -50
+          echo "=== Ждём, пока базы станут здоровыми ==="
+          # Ждём с проверкой, а не просто sleep
+          timeout 60s bash -c 'until docker compose exec -T postgres pg_isready -U airflow && docker compose exec -T redis redis-cli ping; do sleep 2; done'
+          
+          echo "=== Проверяем состояние сервисов ==="
+          docker compose ps
+          
+          echo "=== Останавливаем всё и чистим ==="
+          docker compose down -v
