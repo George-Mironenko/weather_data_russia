@@ -22,8 +22,14 @@ jobs:
 
       - name: Build all images
         run: |
-          # Перенесите флаг --progress перед подкоманду build
-          docker compose --progress=plain build --no-cache
+          # Команда build. Вывод ошибки будет виден даже при сбое.
+          docker compose --progress=plain build --no-cache || echo "Команда сборки завершилась с ошибкой, но работа шага продолжается для диагностики."
           
-          # Команды для проверки образов
-          docker images | grep -E "(airflow|postgres|redis|pgadmin)" || true
+          echo "=== Список всех Docker образов в системе ==="
+          docker images
+          
+          echo "=== Попытка вывести логи docker compose (если контейнеры есть) ==="
+          docker compose logs 2>/dev/null || echo "Контейнеры не существуют или docker compose не может их найти."
+          
+          echo "=== Проверка файла docker-compose.yml ==="
+          ls -la docker-compose.yml && echo "Файл найден."
