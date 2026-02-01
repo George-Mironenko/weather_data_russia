@@ -22,14 +22,14 @@ jobs:
 
       - name: Build all images
         run: |
-          # Команда build. Вывод ошибки будет виден даже при сбое.
-          docker compose --progress=plain build --no-cache || echo "Команда сборки завершилась с ошибкой, но работа шага продолжается для диагностики."
+          echo "=== Проверка синтаксиса и содержимого docker-compose.yml ==="
+          # Проверяем синтаксис YAML (первая строка с ошибкой укажет на проблему)
+          python3 -c "import yaml, sys; yaml.safe_load(open('docker-compose.yml')); print('✅ YAML синтаксис корректен')"
           
-          echo "=== Список всех Docker образов в системе ==="
-          docker images
+          echo "=== Какие сервисы видит Docker Compose? ==="
+          # Пытаемся просто вывести конфигурацию
+          docker compose config --services 2>&1 || echo "Не удалось прочитать конфигурацию."
           
-          echo "=== Попытка вывести логи docker compose (если контейнеры есть) ==="
-          docker compose logs 2>/dev/null || echo "Контейнеры не существуют или docker compose не может их найти."
-          
-          echo "=== Проверка файла docker-compose.yml ==="
-          ls -la docker-compose.yml && echo "Файл найден."
+          echo "=== Запускаем сборку с максимально подробным выводом ==="
+          # Теперь запускаем сборку
+          docker compose --verbose build --no-cache 2>&1 | head -50
