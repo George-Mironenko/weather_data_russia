@@ -17,23 +17,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Build containers
+        run: docker-compose build
+
+      - name: Start containers
+        run: docker-compose up -d
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-
-      - name: Test service startup
-        run: |
-          echo "=== Пытаемся скачать образы ==="
-          docker compose pull || echo "Не все образы удалось скачать, но продолжаем"
-          
-          echo "=== Запускаем только базы данных (Postgres и Redis) ==="
-          docker compose up -d postgres redis
-          
-          echo "=== Ждём, пока базы станут здоровыми ==="
-          # Ждём с проверкой, а не просто sleep
-          timeout 60s bash -c 'until docker compose exec -T postgres pg_isready -U airflow && docker compose exec -T redis redis-cli ping; do sleep 2; done'
-          
-          echo "=== Проверяем состояние сервисов ==="
-          docker compose ps
-          
-          echo "=== Останавливаем всё и чистим ==="
-          docker compose down -v
