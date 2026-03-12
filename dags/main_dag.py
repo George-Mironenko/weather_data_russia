@@ -7,6 +7,8 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.models import Variable
 
 import logging
+from include.models import WeatherModel
+from pydantic import ValidationError
 
 
 task_logger = logging.getLogger("airflow.task")
@@ -146,155 +148,48 @@ with DAG(
 
     @task
     def load_data_base(weather_data_list):
-        """
-        Загружает данные о погоде из списка в БД
-        :param weather_data_list: Список словарей с данными о погоде
-        :return None
-        """
+        hook = PostgresHook(postgres_conn_id="my_postgres")
+        valid_parameters = []
 
-        sql_insert = """
-            INSERT INTO weather_observations
-                (city_id, condition_id, temp, temp_min, temp_max, pressure, humidity,
-                 visibility, wind_speed, wind_deg, clouds_all, recorded_at, sunrise, sunset)
-            VALUES (
-                %s,
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                TO_TIMESTAMP(%s),
-                TO_TIMESTAMP(%s),
-                TO_TIMESTAMP(%s)
+        for data in weather_data_list:
+            try:
+                # Магия Pydantic: валидация и маппинг в один присест
+                weather = WeatherModel(**data)
+
+                # Получаем city_id (бизнес-логика, которую не засунуть в Pydantic)
+                city_res = hook.get_first('SELECT city_id FROM cities WHERE name = %s',
+                                          (weather.city_name,))
+
+                if not city_res:
+                    task_logger.warning(f"Город {weather.city_name} отсутствует в БД")
+                    continue
+
+                # Формируем кортеж для вставки, обращаясь к объекту через точку
+                valid_parameters.append((
+                    city_res[0], weather.condition_id, weather.temp,
+                    weather.temp_min, weather.temp_max, weather.pressure,
+                    weather.humidity, weather.visibility, weather.wind_speed,
+                    weather.wind_deg, weather.clouds_all, weather.dt,
+                    weather.sunrise, weather.sunset
+                ))
+
+            except ValidationError as e:
+                task_logger.error(f"Ошибка схемы для города {data.get('requested_city')}: {e.errors()}")
+            except Exception as e:
+                task_logger.error(f"Ошибка при обработке города: {e}")
+
+        # Bulk insert через хук
+        if valid_parameters:
+            hook.insert_rows(
+                table='weather_observations',
+                rows=valid_parameters,
+                target_fields=[
+                    'city_id', 'condition_id', 'temp', 'temp_min', 'temp_max',
+                    'pressure', 'humidity', 'visibility', 'wind_speed',
+                    'wind_deg', 'clouds_all', 'recorded_at', 'sunrise', 'sunset'
+                ],
+                commit_every=100
             )
-        """
-
-        parameters = []
-        batch_size = 1000
-
-        # Список для пропущенных данных
-        invalid_records = []
-
-        try:
-            def invalid_records_append(name_city, data_list, test_error: str = 'Not Specified'):
-                """
-                Функция для добавления данные в список пропущенных данных
-                """
-                invalid_records.append(
-                    {'city': name_city, 'error': test_error, 'data': data_list})
-
-            # Подключение к базе данных
-            hook = PostgresHook(postgres_conn_id="my_postgres")
-
-            task_logger.debug("Мы подключились к postgres")
-
-            # Цикл для, добавление данных в пакетах
-            for i in range(0, len(weather_data_list), batch_size):
-
-                # Делаем срез данных и делаем пакет
-                batch = weather_data_list[i: i + batch_size]
-                task_logger.debug("Создали батч")
-
-
-                # Цикл для добавления данных
-                for data in batch:
-                    # Получаем название города
-                    city_name = data.get('requested_city')
-
-                    # Проверяем что данные есть
-                    if data is None:
-                        task_logger.debug(f"batch с {i} до {i + batch_size} пустой")
-                        continue
-
-                    # Проверка, что данные об температуре есть
-                    if not data.get("main"):
-                        invalid_records_append(city_name, data, 'Missing main object')
-                        continue
-
-                    # Проверяем, что данные об температуре есть и они правдивы
-                    if (temp := data['main'].get("temp")) is None:
-                        invalid_records_append(city_name, data, 'Missing temp')
-                        continue
-
-                    if  temp < 223.15 or temp > 323.15:
-                        invalid_records_append(city_name, data, f'Impossible temp: {temp}')
-                        continue
-
-                    # Проверяем, что данные об влажности и они правдивы
-                    if (humidity := data['main'].get('humidity')) is None:
-                        invalid_records_append(city_name, data, 'Missing humidity')
-                        continue
-
-                    if not (0 <= humidity <= 100):
-                        invalid_records_append(city_name, data, f'Invalid humidity: {humidity}')
-                        continue
-
-                    if not (temp_min := data['main'].get('temp_min')):
-                        invalid_records_append(city_name, data, 'Missing temp_min')
-                        continue
-                    elif not (temp_max := data['main'].get('temp_max')):
-                        invalid_records_append(city_name, data, 'Missing temp_max')
-                        continue
-
-                    if temp_min > temp_max:
-                        task_logger.error(f"temp_min ({temp_min}) > temp_max ({temp_max})")
-                        continue
-
-                    if not (temp_min <= temp <= temp_max):
-                        task_logger.error(f"temp ({temp}) not between min/max ({temp_min}/{temp_max})")
-                        continue
-
-
-                    task_logger.debug(f"batch с {i} до {i + batch_size} не пустой")
-
-                    city_id_sql = 'SELECT city_id FROM cities WHERE name = %s'
-                    city_id = hook.get_first(city_id_sql, parameters=(city_name,))
-                    task_logger.debug("Получили city_id")
-
-                    if city_id is None:
-                        task_logger.warning(f"Город {city_name} не найден в базе")
-                        continue
-
-                    task_logger.debug(f"Город {city_name} найден в базе")
-
-                    parameters.append((
-                            city_id[0],
-                            data["weather"][0]["id"],
-                            data["main"]["temp"],
-                            data["main"]["temp_min"],
-                            data["main"]["temp_max"],
-                            data["main"]["pressure"],
-                            data["main"]["humidity"],
-                            data.get("visibility", 0),
-                            data["wind"].get("speed", 0),
-                            data["wind"].get("deg", 0),
-                            data["clouds"].get("all", 0),
-                            data["dt"],
-                            data["sys"]["sunrise"],
-                            data["sys"]["sunset"]
-                    ))
-
-                if invalid_records:
-                    task_logger.warning(f"Найдено {len(invalid_records)} проблемных записей:")
-                    for record in invalid_records:
-                        task_logger.warning(f"Город {record['city']}: {record['error']}")
-
-
-                if parameters:
-                    task_logger.debug("Данные есть в parameters")
-
-                    conn = hook.get_conn()
-                    cursor = conn.cursor()
-
-                    cursor.executemany(sql_insert, parameters)
-                    conn.commit()
-
-                    cursor.close()
-                    task_logger.info(f"Успешно загружено {len(parameters)} записей")
-                else:
-                    task_logger.warning("Нет данных для вставки")
-
-            task_logger.info("Успешно закрытия курсора")
-
-        except Exception as error:
-            task_logger.error(f"Ошибка при преобразование: {error}")
-            raise
 
     # Выполняем задачи
 
