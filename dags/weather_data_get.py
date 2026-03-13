@@ -25,7 +25,7 @@ default_args = {
 
 
 with DAG(
-    dag_id='russia_data_weather',
+    dag_id='weather_data_get',
     default_args=default_args,
     schedule='@daily',
     catchup=False,
