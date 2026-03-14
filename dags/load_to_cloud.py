@@ -36,7 +36,7 @@ default_args = {
 }
 
 with DAG(
-    dag_id="Load_to_S3",
+    dag_id="load_to_cloud",
     default_args=default_args,
     schedule='@monthly',
     fail_fast=True
@@ -81,9 +81,12 @@ with DAG(
 
         # Создание DataFrame из данных
         columns = [
-            "city_name", "weather_id", "temp", "temp_min", "temp_max",
-            "pressure", "humidity", "visibility", "wind_speed", "wind_deg",
-            "clouds_all", "dt", "sunrise", "sunset"
+            "city_name", "lat", "lon", "country_name",
+            "weather_id", "weather_main", "weather_description", "weather_icon",
+            "temp", "temp_min", "temp_max", "pressure", "humidity",
+            "visibility", "wind_speed", "wind_deg", "clouds_all",
+            "dt", "sunrise", "sunset",
+            "data_loaded_at"
         ]
 
         try:
@@ -99,19 +102,26 @@ with DAG(
 
             df = df.astype({
                 "city_name": "string",
+                "country_name": "string",
+                "weather_main": "string",
+                "weather_description": "string",
+                "weather_icon": "string",
                 "weather_id": "int32",
-                "temp": "float32",
-                "temp_min": "float32",
-                "temp_max": "float32",
                 "pressure": "int32",
                 "humidity": "int32",
                 "visibility": "int32",
-                "wind_speed": "float32",
                 "wind_deg": "int16",
                 "clouds_all": "int8",
-                "dt": "int64",
-                "sunrise": "int64",
-                "sunset": "int64"
+                "lat": "float32",
+                "lon": "float32",
+                "temp": "float32",
+                "temp_min": "float32",
+                "temp_max": "float32",
+                "wind_speed": "float32",
+                "dt": "datetime64[ns]",
+                "sunrise": "datetime64[ns]",
+                "sunset": "datetime64[ns]",
+                "data_loaded_at": "datetime64[ns]"
             })
 
             return df
@@ -126,6 +136,10 @@ with DAG(
         :param data_frame: Данные для преобразования
         """
         try:
+            if data_frame.empty:
+                task_logger.warning("DataFrame пуст, ничего не загружаем")
+                return
+
             buffer = io.BytesIO()
             data_frame.to_parquet(buffer, engine='pyarrow', compression='snappy', index=False)
             task_logger.debug("Буфер и файл parquet созданы")
@@ -145,6 +159,8 @@ with DAG(
                 ContentType='application/octet-stream'
             )
             task_logger.info("Успешно отправили файл в s3")
+
+            return "success"
 
         except Exception as error:
             task_logger.error(f"Ошибка при преобразовании данных: {error}")
