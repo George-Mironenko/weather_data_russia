@@ -36,7 +36,7 @@ default_args = {
 }
 
 with DAG(
-    dag_id="Load_to_S3",
+    dag_id="load_to_cloud",
     default_args=default_args,
     schedule='@monthly',
     fail_fast=True

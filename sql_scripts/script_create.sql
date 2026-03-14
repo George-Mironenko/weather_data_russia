@@ -36,9 +36,9 @@ CREATE TABLE IF NOT EXISTS weather_observations (
             wind_speed DECIMAL(5,2) NOT NULL,
             wind_deg INT NOT NULL,
             clouds_all INT NOT NULL,
-            recorded_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
-            sunrise TIMESTAMP WITHOUT TIME ZONE,
-            sunset TIMESTAMP WITHOUT TIME ZONE,
+            recorded_at TIMESTAMP WITH TIME ZONE NOT NULL,
+            sunrise TIMESTAMP WITH TIME ZONE,
+            sunset TIMESTAMP WITH TIME ZONE,
             created_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -161,21 +161,34 @@ VALUES
     ('Moscow',      (SELECT "id" FROM "country" WHERE "name" = 'Russia'), 55.755826, 37.617300),
     ('London',      (SELECT "id" FROM "country" WHERE "name" = 'United Kingdom'), 51.507351, -0.127758);
 
-CREATE VIEW all_data AS
+CREATE OR REPLACE VIEW all_data AS
 SELECT
+    -- Город
     c.name AS city_name,
+    c.lat AS lat,
+    c.lon AS lon,
+    cnt.name AS country_name,
     w.condition_id AS weather_id,
-    w.temp,
-    w.temp_min,
-    w.temp_max,
-    w.pressure,
-    w.humidity,
-    w.visibility,
-    w.wind_speed,
-    w.wind_deg,
-    w.clouds_all,
+    wmt.main_name AS weather_main,
+    wc.description AS weather_description,
+    wi.icon_code AS weather_icon,
+    w.temp AS temp,
+    w.temp_min AS temp_min,
+    w.temp_max AS temp_max,
+    w.pressure AS pressure,
+    w.humidity AS humidity,
+    w.visibility AS visibility,
+    w.wind_speed AS wind_speed,
+    w.wind_deg AS wind_deg,
+    w.clouds_all AS clouds_all,
     w.recorded_at AS dt,
-    w.sunrise,
-    w.sunset
+    w.sunrise AS sunrise,
+    w.sunset AS sunset,
+    w.created_at AS data_loaded_at
+
 FROM weather_observations w
-JOIN cities c ON w.city_id = c.city_id;
+JOIN cities c ON w.city_id = c.city_id
+JOIN country cnt ON c.country = cnt.id
+JOIN weather_conditions wc ON w.condition_id = wc.condition_id
+JOIN weather_main_types wmt ON wc.main = wmt.main_id
+JOIN weather_icons wi ON wc.icon = wi.icons_id;

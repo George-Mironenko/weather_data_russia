@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 
 import requests
 from airflow.sdk import DAG
@@ -25,7 +25,7 @@ default_args = {
 
 
 with DAG(
-    dag_id='russia_data_weather',
+    dag_id='weather_data_get',
     default_args=default_args,
     schedule='@daily',
     catchup=False,
@@ -63,9 +63,9 @@ with DAG(
                 task_logger.error(f"Ошибка: в функцию передан пустой список")
                 return None
 
-            def writte_log(warrning: str):
+            def write_log(warrning: str):
                 task_logger.warning(
-                    f"Запись #{idx} пропущена: warrning"
+                    f"Запись #{warrning} пропущена: warrning"
                 )
 
             cities_list = []
@@ -73,19 +73,19 @@ with DAG(
             for idx, record in enumerate(records, 1):
 
                 if not isinstance(record, tuple):
-                    writte_log("ожидался tuple")
+                    write_log("ожидался tuple")
                     continue
 
                 if not record:
-                    writte_log("пустой кортеж")
+                    write_log("пустой кортеж")
                     continue
 
                 if not isinstance(first_records :=  record[0], str):
-                    writte_log("первый элемент не строка")
+                    write_log("первый элемент не строка")
                     continue
 
                 if  not first_records.strip():
-                    writte_log("пустая строка или пробелы")
+                    write_log("пустая строка или пробелы")
                     continue
 
                 cities_list.append(first_records)
@@ -169,8 +169,8 @@ with DAG(
                     city_res[0], weather.condition_id, weather.temp,
                     weather.temp_min, weather.temp_max, weather.pressure,
                     weather.humidity, weather.visibility, weather.wind_speed,
-                    weather.wind_deg, weather.clouds_all, weather.dt,
-                    weather.sunrise, weather.sunset
+                    weather.wind_deg, weather.clouds_all, weather.recorded_at,
+                    weather.sunrise_dt, weather.sunset_dt
                 ))
 
             except ValidationError as e:
