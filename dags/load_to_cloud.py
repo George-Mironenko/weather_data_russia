@@ -160,6 +160,8 @@ with DAG(
             )
             task_logger.info("Успешно отправили файл в s3")
 
+            return "success"
+
         except Exception as error:
             task_logger.error(f"Ошибка при преобразовании данных: {error}")
             raise
