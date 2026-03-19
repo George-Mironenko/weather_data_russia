@@ -27,14 +27,11 @@ Built as a learning project in **data engineering**, it demonstrates:
    cd weather_data_russia
    ```
 
-2. Set up environment variables (`.env` file):
-   ```ini
-   POSTGRES_USER=your_user
-   POSTGRES_PASSWORD=your_password
-   OPENWEATHER_API_KEY=your_api_key
-   SELECTEL_ACCESS_KEY=your_key
-   SELECTEL_SECRET_KEY=your_secret
-   SELECTEL_ENDPOINT=your_endpoint
+2. **Настройка переменных окружения**:
+    Скопируйте файл-пример и отредактируйте его, вставив свои ключи API и пароли:
+    ```bash
+    cp .env.example .env
+    nano .env
    ```
 3. Launch with Docker:
    ```bash
