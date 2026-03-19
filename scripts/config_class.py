@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class ConfigSettings(BaseModel):
     """class config for getting parameters from .env"""
 
@@ -33,13 +34,26 @@ class ConfigSettings(BaseModel):
     )
 
 
-    # OpenWeather
-    OPENWEATHER_API_KEY: str = os.getenv('OPENWEATHER_API_KEY')
+    # OpenWeather - required field
+    OPENWEATHER_API_KEY: str = Field(
+        default=os.getenv('OPENWEATHER_API_KEY'),
+        description="OpenWeather API key"
+    )
+
 
     # S3
-    SELECTEL_ACCESS_KEY: str = os.getenv('SELECTEL_ACCESS_KEY')
-    SELECTEL_SECRET_KEY: str = os.getenv('SELECTEL_SECRET_KEY')
-    SELECTEL_ENDPOINT: str = os.getenv('SELECTEL_ENDPOINT')
+    SELECTEL_ACCESS_KEY: str = Field(
+        default=os.getenv('SELECTEL_ACCESS_KEY', ''),
+        description="S3 access key"
+    )
+    SELECTEL_SECRET_KEY: str = Field(
+        default=os.getenv('SELECTEL_SECRET_KEY', ''),
+        description="S3 secret key"
+    )
+    SELECTEL_ENDPOINT: str = Field(
+        default=os.getenv('SELECTEL_ENDPOINT', ''),
+        description="S3 endpoint URL"
+    )
 
 
     @property
