@@ -6,9 +6,9 @@ from airflow.models import Variable
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow import DAG
 from airflow.decorators import task
-import boto3
-
 import logging
+
+from s3_bucket_service.s3_class import S3BucketService
 
 
 # Configuring  logger
@@ -18,11 +18,11 @@ def get_s3_client():
     """
     Creating client s3 storage
     """
-    return boto3.client(
-        's3',
-        endpoint_url='https://s3.storage.selcloud.ru',
-        aws_access_key_id=Variable.get("SELECTEL_ACCESS_KEY"),
-        aws_secret_access_key=Variable.get("SELECTEL_SECRET_KEY")
+    return S3BucketService(
+        bucket_name = 'weather-data',
+        endpoint='https://s3.storage.selcloud.ru',
+        access_key=Variable.get("SELECTEL_ACCESS_KEY"),
+        secret_key=Variable.get("SELECTEL_SECRET_KEY")
     )
 
 default_args = {
@@ -147,17 +147,13 @@ with DAG(
             s3 = get_s3_client()
             task_logger.debug("Клиент s3 создан")
 
-            bucket_name = 'weather-data'
             file_name = f'data_{datetime.now().year}-{datetime.now().month:02d}.parquet'
             task_logger.debug("Название файла создано")
 
             # Отправка данных
-            s3.put_object(
-                Bucket=bucket_name,
-                Key=file_name,
-                Body=buffer.getvalue(),
-                ContentType='application/octet-stream'
-            )
+            prefix = f"weather/{datetime.now().year}/{datetime.now().month:02d}/{datetime.now().day}"
+            s3.upload_file_object(prefix, file_name, buffer.getvalue())
+
             task_logger.info("Успешно отправили файл в s3")
 
             return "success"

@@ -62,23 +62,22 @@ x-airflow-common:
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
-    # yamllint disable rule:line-length
-    # Use simple http server on scheduler for health checks
-    # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
-    # yamllint enable rule:line-length
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
-    # WARNING: Use _PIP_ADDITIONAL_REQUIREMENTS option ONLY for a quick checks
-    # for other purpose (development, test and especially production usage) build/extend Airflow image.
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
-    # The following line can be used to set a custom config file, stored in the local config folder
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
-    PYTHONPATH: /opt/airflow:/opt/airflow/include
+
+    AIRFLOW__API_AUTH__JWT_SECRET: "change-this-to-random-string-in-production"
+
+    # 🔥 PYTHONPATH ДОЛЖЕН БЫТЬ ВНУТРИ environment:
+    PYTHONPATH: "/opt/airflow:/opt/airflow/include:/opt/airflow/s3_bucket_service"
   volumes:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
     - ${AIRFLOW_PROJ_DIR:-.}/include:/opt/airflow/include
+    - ${AIRFLOW_PROJ_DIR:-.}/s3_bucket_service:/opt/airflow/s3_bucket_service
+    - ${AIRFLOW_PROJ_DIR:-.}/sql_scripts:/opt/airflow/sql_scripts
     - ${AIRFLOW_PROJ_DIR:-.}/sql_scripts:/opt/airflow/sql_scripts
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:

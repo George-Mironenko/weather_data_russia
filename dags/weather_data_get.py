@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime, timezone
+from datetime import timedelta, datetime
 
 import requests
 from airflow.sdk import DAG
