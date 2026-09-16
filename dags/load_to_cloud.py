@@ -11,6 +11,10 @@ import logging
 from s3_bucket_service.s3_class import S3BucketService
 
 
+LONG_DESCRIPTION = """
+Из postgres данные отправляються в 3
+"""
+
 # Configuring  logger
 task_logger = logging.getLogger("airflow.task")
 
@@ -39,8 +43,10 @@ with DAG(
     dag_id="load_to_cloud",
     default_args=default_args,
     schedule='@monthly',
+    description=LONG_DESCRIPTION,
     fail_fast=True
 ) as dag:
+    dag.doc_md = LONG_DESCRIPTION
 
     @task
     def extract():
