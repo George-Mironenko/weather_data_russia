@@ -35,6 +35,27 @@ services:
     ports:
       - "5432:5432"
 
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        mkdir -p /opt/airflow/{logs,dags,plugins,config}
+        chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/
+        /entrypoint airflow db migrate
+        /entrypoint airflow users create \
+          --username ${_AIRFLOW_WWW_USER_USERNAME:-airflow} \
+          --password ${_AIRFLOW_WWW_USER_PASSWORD:-airflow} \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+    user: "0:0"
+
   airflow-apiserver:
     <<: *airflow-common
     command: api-server
@@ -60,27 +81,6 @@ services:
     depends_on:
       - weather_postgres
       - airflow-scheduler
-
-  airflow-init:
-    <<: *airflow-common
-    entrypoint: /bin/bash
-    command:
-      - -c
-      - |
-        mkdir -p /opt/airflow/{logs,dags,plugins,config}
-        chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/
-        /entrypoint airflow db migrate
-        /entrypoint airflow users create \
-          --username ${_AIRFLOW_WWW_USER_USERNAME:-airflow} \
-          --password ${_AIRFLOW_WWW_USER_PASSWORD:-airflow} \
-          --firstname Admin \
-          --lastname User \
-          --role Admin \
-          --email admin@example.com
-    environment:
-      <<: *airflow-common-env
-      _AIRFLOW_DB_MIGRATE: 'true'
-    user: "0:0"
 
   weather_dbt:
     build:
