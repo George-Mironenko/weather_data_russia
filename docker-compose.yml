@@ -83,5 +83,17 @@ services:
       _AIRFLOW_DB_MIGRATE: 'true'
     user: "0:0"
 
+  weather_dbt:
+    build:
+      context: ./dbt_project
+    container_name: weather_dbt
+    depends_on:
+      weather_postgres:
+        condition: service_healthy       # ← ждём, пока Postgres реально готов
+    volumes:
+      - ./dbt_project:/dbt               # ← монтируем проект для live-разработки
+    working_dir: /dbt
+    command: [ "dbt", "run" ]
+
 volumes:
   postgres-db-volume:
