@@ -24,7 +24,7 @@ x-airflow-common:
       condition: service_healthy
 
 services:
-  weather_postgres:
+  postgres:
     build: ./postgres
     environment:
       POSTGRES_USER: airflow
@@ -63,7 +63,7 @@ services:
       - "8080:8080"
     restart: always
     depends_on:
-      - weather_postgres
+      - postgres
       - airflow-init
 
   airflow-scheduler:
@@ -71,7 +71,7 @@ services:
     command: scheduler
     restart: always
     depends_on:
-      - weather_postgres
+      - postgres
       - airflow-init
 
   airflow-worker:
@@ -79,7 +79,7 @@ services:
     command: celery worker
     restart: always
     depends_on:
-      - weather_postgres
+      - postgres
       - airflow-scheduler
 
   weather_dbt:
