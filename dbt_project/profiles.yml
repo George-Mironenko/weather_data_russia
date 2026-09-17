@@ -3,7 +3,7 @@ dbt_project:
   outputs:
     dev:
       type: postgres
-      host: weather_postgres        # ← имя сервиса в docker-compose!
+      host: weather_postgres
       user: airflow
       password: airflow
       port: 5432
