@@ -1,0 +1,14 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "Сырые данные из OpenWeatherMap API"
+    schema: public              # ← твои таблицы в public
+    database: weather_db
+    tables:
+      - name: cities
+      - name: country
+      - name: weather_observations
+      - name: weather_conditions
+      - name: weather_main_types
+      - name: weather_icons
