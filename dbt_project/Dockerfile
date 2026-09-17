@@ -7,7 +7,6 @@ WORKDIR /dbt
 COPY dbt_project.yml .
 COPY profiles.yml .
 COPY models/ ./models/
-COPY tests/ ./tests/
 
 # По умолчанию — просто показать версию.
 # Реальная команда (dbt run) задаётся в docker-compose.
