@@ -148,6 +148,9 @@ with DAG(
 
     @task
     def load_data_base(weather_data_list):
+        """
+        Задача по загрузке данных в базу данных postgres
+        """
         hook = PostgresHook(postgres_conn_id="my_postgres")
         valid_parameters = []
 
