@@ -25,7 +25,7 @@ x-airflow-common:
 
 services:
   weather_postgres:
-    build: ./postgres        # ← собирает из Dockerfile в папке ./postgres
+    build: ./postgres
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
@@ -42,7 +42,7 @@ services:
       - "8080:8080"
     restart: always
     depends_on:
-      - postgres
+      - weather_postgres
       - airflow-init
 
   airflow-scheduler:
@@ -50,16 +50,15 @@ services:
     command: scheduler
     restart: always
     depends_on:
-      - postgres
+      - weather_postgres
       - airflow-init
 
   airflow-worker:
     <<: *airflow-common
-    command: celery worker   # 👈 ОСТАВЬ! LocalExecutor всё равно не использует,
-                            # но команда нужна для совместимости
+    command: celery worker
     restart: always
     depends_on:
-      - postgres
+      - weather_postgres
       - airflow-scheduler
 
   airflow-init:
@@ -89,9 +88,9 @@ services:
     container_name: weather_dbt
     depends_on:
       weather_postgres:
-        condition: service_healthy       # ← ждём, пока Postgres реально готов
+        condition: service_healthy
     volumes:
-      - ./dbt_project:/dbt               # ← монтируем проект для live-разработки
+      - ./dbt_project:/dbt
     working_dir: /dbt
     command: [ "dbt", "run" ]
 
