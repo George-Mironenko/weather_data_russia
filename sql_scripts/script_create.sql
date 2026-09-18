@@ -161,34 +161,6 @@ VALUES
     ('Moscow',      (SELECT "id" FROM "country" WHERE "name" = 'Russia'), 55.755826, 37.617300),
     ('London',      (SELECT "id" FROM "country" WHERE "name" = 'United Kingdom'), 51.507351, -0.127758);
 
-CREATE OR REPLACE VIEW all_data AS
-SELECT
-    -- Город
-    c.name AS city_name,
-    c.lat AS lat,
-    c.lon AS lon,
-    cnt.name AS country_name,
-    w.condition_id AS weather_id,
-    wmt.main_name AS weather_main,
-    wc.description AS weather_description,
-    wi.icon_code AS weather_icon,
-    w.temp AS temp,
-    w.temp_min AS temp_min,
-    w.temp_max AS temp_max,
-    w.pressure AS pressure,
-    w.humidity AS humidity,
-    w.visibility AS visibility,
-    w.wind_speed AS wind_speed,
-    w.wind_deg AS wind_deg,
-    w.clouds_all AS clouds_all,
-    w.recorded_at AS dt,
-    w.sunrise AS sunrise,
-    w.sunset AS sunset,
-    w.created_at AS data_loaded_at
-
-FROM weather_observations w
-JOIN cities c ON w.city_id = c.city_id
-JOIN country cnt ON c.country = cnt.id
-JOIN weather_conditions wc ON w.condition_id = wc.condition_id
-JOIN weather_main_types wmt ON wc.main = wmt.main_id
-JOIN weather_icons wi ON wc.icon = wi.icons_id;
+-- NOTE: the `all_data` view used to be defined here by hand.
+-- It is now built and tested by dbt as models/marts/all_data.sql
+-- in the weather_dbt/ project. See weather_dbt/README.md.

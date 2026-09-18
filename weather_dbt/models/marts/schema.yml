@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: all_data
+    description: "Denormalized weather observations joined with city, country and condition lookups. Replaces the old hand-written Postgres VIEW."
+    columns:
+      - name: city_name
+        tests: [not_null]
+      - name: country_name
+        tests: [not_null]
+      - name: weather_id
+        tests: [not_null]
+      - name: weather_main
+        tests: [not_null]
+      - name: weather_description
+        tests: [not_null]
+      - name: temp
+        tests: [not_null]
+      - name: humidity
+        tests: [not_null]
+      - name: dt
+        tests: [not_null]
