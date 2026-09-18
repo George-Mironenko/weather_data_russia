@@ -1,0 +1,31 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: public
+    description: "Raw tables loaded/maintained by the Airflow DAGs and sql_scripts/script_create.sql"
+    tables:
+      - name: cities
+        columns:
+          - name: city_id
+            tests: [not_null, unique]
+      - name: country
+        columns:
+          - name: id
+            tests: [not_null, unique]
+      - name: weather_main_types
+        columns:
+          - name: main_id
+            tests: [not_null, unique]
+      - name: weather_icons
+        columns:
+          - name: icons_id
+            tests: [not_null, unique]
+      - name: weather_conditions
+        columns:
+          - name: condition_id
+            tests: [not_null, unique]
+      - name: weather_observations
+        columns:
+          - name: weather_observations_id
+            tests: [not_null, unique]

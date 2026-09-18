@@ -1,0 +1,73 @@
+version: 2
+
+models:
+  - name: stg_cities
+    columns:
+      - name: city_id
+        tests: [not_null, unique]
+      - name: name
+        tests: [not_null, unique]
+      - name: country
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_country')
+              field: id
+
+  - name: stg_country
+    columns:
+      - name: id
+        tests: [not_null, unique]
+      - name: name
+        tests: [not_null, unique]
+
+  - name: stg_weather_main_types
+    columns:
+      - name: main_id
+        tests: [not_null, unique]
+      - name: main_name
+        tests: [not_null, unique]
+
+  - name: stg_weather_icons
+    columns:
+      - name: icons_id
+        tests: [not_null, unique]
+
+  - name: stg_weather_conditions
+    columns:
+      - name: condition_id
+        tests: [not_null, unique]
+      - name: main
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_weather_main_types')
+              field: main_id
+      - name: icon
+        tests:
+          - relationships:
+              to: ref('stg_weather_icons')
+              field: icons_id
+
+  - name: stg_weather_observations
+    columns:
+      - name: weather_observations_id
+        tests: [not_null, unique]
+      - name: city_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_cities')
+              field: city_id
+      - name: condition_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_weather_conditions')
+              field: condition_id
+      - name: temp
+        tests: [not_null]
+      - name: humidity
+        tests: [not_null]
+      - name: recorded_at
+        tests: [not_null]
